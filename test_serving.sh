@@ -5,8 +5,8 @@ python benchmarks/benchmark_serving.py \
     --trust-remote-code \
     --dataset benchmarks/ShareGPT_V3_unfiltered_cleaned_split.json \
     --request-rate 10 \
-    --num-prompts 10 \
+    --num-prompts 1000 \
     --save-result \
     --exp-dir result \
     --exp-name kv-cache \
-    --version 0 \
+    --version 8 \
