@@ -15,6 +15,7 @@ On the client side, run:
         --tokenizer <your_model> --dataset <target_dataset> \
         --request-rate <request_rate>
 """
+import os
 import argparse
 import asyncio
 import json
@@ -293,9 +294,11 @@ def main(args: argparse.Namespace):
 
         # Save to file
         base_model_id = model_id.split("/")[-1]
-        file_name = f"{backend}-{args.request_rate}qps-{base_model_id}-{current_dt}.json"
+        file_name = f"{args.exp_dir}/{args.exp_name}-{backend}-{args.request_rate}qps-{base_model_id}-{current_dt}.json"
+        if os.path.exists(args.exp_dir) is False:
+            os.makedirs(args.exp_dir)
         with open(file_name, "w") as outfile:
-            json.dump(result_json, outfile)
+            json.dump(result_json, outfile, ensure_ascii=False, indent=4)
 
 
 if __name__ == "__main__":
@@ -381,6 +384,16 @@ if __name__ == "__main__":
         "--save-result",
         action="store_true",
         help="Specify to save benchmark results to a json file",
+    )
+    parser.add_argument(
+        "--exp-dir",
+        default="result",
+        help="Name of experiment directory"
+    )
+    parser.add_argument(
+        "--exp-name",
+        default="exp",
+        help="Name of experiment"
     )
 
     args = parser.parse_args()
