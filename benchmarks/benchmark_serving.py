@@ -36,6 +36,12 @@ from backend_request_func import (
     RequestFuncOutput,
 )
 
+import os, sys
+
+sys.path.append("/root/vllm/services/vllm")
+
+from config import override_config
+
 
 @dataclass
 class BenchmarkMetrics:
@@ -294,11 +300,14 @@ def main(args: argparse.Namespace):
 
         # Save to file
         base_model_id = model_id.split("/")[-1]
-        file_name = f"{args.exp_dir}/{args.exp_name}-{backend}-{args.request_rate}qps-{base_model_id}-{current_dt}.json"
-        if os.path.exists(args.exp_dir) is False:
-            os.makedirs(args.exp_dir)
-        with open(file_name, "w") as outfile:
-            json.dump(result_json, outfile, ensure_ascii=False, indent=4)
+        file_name = f"{args.exp_dir}/{args.version}/{args.exp_name}-{backend}-{args.request_rate}qps-{base_model_id}-{current_dt}.json"
+        if os.path.exists(f"{args.exp_dir}/{args.version}") is False:
+            os.makedirs(f"{args.exp_dir}/{args.version}")
+        config_name = f"{args.exp_dir}/{args.version}/config.json"
+        with open(config_name, "w") as f:
+            json.dump(override_config, f, ensure_ascii=False, indent=4)
+        with open(file_name, "w") as f:
+            json.dump(result_json, f, ensure_ascii=False, indent=4)
 
 
 if __name__ == "__main__":

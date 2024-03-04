@@ -3,7 +3,7 @@ NOTE: This API server is used only for demonstrating usage of AsyncEngine and si
 It is not intended for production use. For production use, we recommend using our OpenAI compatible server.
 We are also not going to accept PRs modifying this file, please change `vllm/entrypoints/openai/api_server.py` instead.
 """
-
+from contextlib import asynccontextmanager
 import argparse
 import json
 from typing import AsyncGenerator
@@ -17,10 +17,43 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 from vllm.sampling_params import SamplingParams
 from vllm.utils import random_uuid
 
-TIMEOUT_KEEP_ALIVE = 5  # seconds.
-app = FastAPI()
-engine = None
+from config import override_config
 
+TIMEOUT_KEEP_ALIVE = 5  # seconds.
+engine = None
+parser = argparse.ArgumentParser()
+parser.add_argument("--host", type=str, default=None)
+parser.add_argument("--port", type=int, default=8000)
+parser.add_argument("--ssl-keyfile", type=str, default=None)
+parser.add_argument("--ssl-certfile", type=str, default=None)
+parser.add_argument(
+    "--root-path",
+    type=str,
+    default=None,
+    help="FastAPI root_path when app is behind a path based routing proxy")
+parser = AsyncEngineArgs.add_cli_args(parser)
+
+args = parser.parse_args()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global args, engine
+    # override config
+    for key, value in override_config.items():
+        setattr(args, key, value)
+
+    engine_args = AsyncEngineArgs.from_cli_args(args)
+    engine = AsyncLLMEngine.from_engine_args(engine_args)
+
+    print('Args:', args)
+    print('Engine:', engine)
+
+    app.root_path = args.root_path
+
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 async def health() -> Response:
@@ -79,27 +112,14 @@ async def generate(request: Request) -> Response:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", type=str, default=None)
-    parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--ssl-keyfile", type=str, default=None)
-    parser.add_argument("--ssl-certfile", type=str, default=None)
-    parser.add_argument(
-        "--root-path",
-        type=str,
-        default=None,
-        help="FastAPI root_path when app is behind a path based routing proxy")
-    parser = AsyncEngineArgs.add_cli_args(parser)
-    args = parser.parse_args()
-
-    engine_args = AsyncEngineArgs.from_cli_args(args)
-    engine = AsyncLLMEngine.from_engine_args(engine_args)
-
-    app.root_path = args.root_path
-    uvicorn.run(app,
-                host=args.host,
-                port=args.port,
-                log_level="debug",
-                timeout_keep_alive=TIMEOUT_KEEP_ALIVE,
-                ssl_keyfile=args.ssl_keyfile,
-                ssl_certfile=args.ssl_certfile)
+    uvicorn.run(
+        "api_server:app",
+        host=args.host,
+        port=args.port,
+        log_level="debug",
+        timeout_keep_alive=TIMEOUT_KEEP_ALIVE,
+        ssl_keyfile=args.ssl_keyfile,
+        ssl_certfile=args.ssl_certfile,
+        reload=True,
+        reload_dirs=['services/vllm']
+    )
